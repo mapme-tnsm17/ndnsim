@@ -1,1 +1,9 @@
 ndnSIM code with mapme implementations
+
+
+we have mainly extended the official ndnSIM 2.1 code with our own implementations of mapme, KITE, anchor-based mobility management protocol.
+In particular, we have implmentated:
+    1) a mapme forwarder (NFD/daemon/fw/forwarder-mapme.h{c}pp)
+    2) a kite forwarder (NFD/daemon/fw/forwarder-kite.h{c}pp)
+    3) anchor-based forwarder (forwarder-anchor.h{c}pp)
+as well as other utility codes for metrics computations and other functionalities.
