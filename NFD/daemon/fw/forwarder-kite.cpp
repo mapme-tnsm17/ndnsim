@@ -334,7 +334,7 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
 
   /* HOOK : TRACING INTERESTS = consumer interests following a trace
    * traceName should be set in the header
-   * 
+   *
    * we create a temp interest to create a pit entry just to check whether it
    * was existing before = to check for the presence of a trace.
    * if trace follow trace otherwise follow FIB ... based on what...
@@ -356,23 +356,23 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
     if (tfEntryElement.second) { // isNew
       // The second element of the pair is a boolean indicating if the insertion
       // happened (True) or if the call returned an existing PIT entry (False)
-      // 
+      //
       // No trace, we won't be able to forward this interest. Let's wait for a
       // new trace eventually.
       //
       // Note that even if we had forwarded it, it could be an old trace. That's
       // also why we forward on all of them when we find more than one.
       NFD_LOG_TRACE("traced pit entry not found, tracename="<< interest.getTraceName());
-    } else { 
+    } else {
       NFD_LOG_TRACE("traced pit entry is found" << ", traced pitEntry=" << (void*)(tracedPitEntry.get()) );
       const pit::InRecordCollection& inRecords = tracedPitEntry->getInRecords();
- 
+
       NFD_LOG_TRACE("traced pitEntry's inrecord size=" << inRecords.size());
       //for(pit::InRecordCollection::const_iterator it=inRecords.begin(); it!=inRecords.end(); ++it) {
       for (auto & it : inRecords) {
         if (!IS_TRACED(it.getInterest())) {
           NFD_LOG_TRACE("meet traced interest, inFace=" << it.getFace()->getId() <<", not traceable");
-     
+
           continue; /*NOTE: instead of dropping the interest, we continue the processing of interest*/
         }
 
@@ -387,33 +387,37 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
           if (&inFace == incomingFace.get())
             NFD_LOG_TRACE("its inFace=" << incomingFace->getId() <<", equal to inface of tracing interest, not forwardable to");
           else if(incomingFace->getId() == -1)
-            NFD_LOG_TRACE("its inFace=" << incomingFace->getId() <<", now it is down, not forwardable to this face");	  
+            NFD_LOG_TRACE("its inFace=" << incomingFace->getId() <<", now it is down, not forwardable to this face");
           else {
             if (pitEntry->canForwardTo(*incomingFace)) { //if the tracing interest is forwardable to this incoming face
-
               NFD_LOG_TRACE("tracing interest is forwardable to its inface=" << incomingFace->getId() << ", to be forwarded ...");
               isForwardedAsTracing = true;
-
-    
-    //NOTE: check if pullbit is set
-    if(m_isPull){
-    NFD_LOG_INFO("insert tracing interest into the TNT(Trace Name Table) entry" << interest.getName());
-
-    //get the TNT entry:
-    shared_ptr<pit::TntEntry> pitTntEntry = tracedPitEntry->getStrategyInfo<pit::TntEntry>();
-    if (!static_cast<bool>(pitTntEntry)) {
-      NFD_LOG_TRACE("TNT entry not found , create it");
-      pitTntEntry=make_shared<pit::TntEntry>(tracedPitEntry->getName());
-      tracedPitEntry->setStrategyInfo(pitTntEntry);
+///////////
+// My changes.
+            }
+          }
+        }
+      }
     }
-    NFD_LOG_TRACE("add tracing record");
-    // add tracing record:
-    pitTntEntry->addTracingRecord(weak_ptr<const Interest>(interest.shared_from_this())
-        ,weak_ptr<Face>(face)
-        ,weak_ptr<pit::Entry>(pitEntry)
-        );
+//////////
+
+    //NOTE: check if pullbit is set
+    if(m_isPull) {
+      NFD_LOG_INFO("insert tracing interest into the TNT(Trace Name Table) entry" << interest.getName());
+
+      //get the TNT entry:
+      shared_ptr<pit::TntEntry> pitTntEntry = tracedPitEntry->getStrategyInfo<pit::TntEntry>();
+      if (!static_cast<bool>(pitTntEntry)) {
+        NFD_LOG_TRACE("TNT entry not found , create it");
+        pitTntEntry=make_shared<pit::TntEntry>(tracedPitEntry->getName());
+        tracedPitEntry->setStrategyInfo(pitTntEntry);
+      }
+      NFD_LOG_TRACE("add tracing record");
+      // add tracing record:
+      pitTntEntry->addTracingRecord(weak_ptr<const Interest>(interest.shared_from_this()),
+      weak_ptr<Face>(face), weak_ptr<pit::Entry>(pitEntry));
     } // end m_isPull
-    
+
     //    NFD_LOG_INFO("add tracing record, successful");
   } // END HOOK : TRACING INTEREST
 
@@ -430,58 +434,55 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
     m_onProcessing(interest.getName().toUri(), SEQ_NA, TTL_NA, RETX_NA);
     NFD_LOG_INFO("2) ForwarderKite processing traced interest, creating trace, name=" << interest.getName() << ", traceable" <<", pitEntry=" <<(void*)(pitEntry.get()) << " - inFace=" << inFace.getDescription() );
 
-//     std::cout<<"receiving traced interest="<<interest.getName()<<", at="<<(void*)this<<"\n";
+//  std::cout<<"receiving traced interest="<<interest.getName()<<", at="<<(void*)this<<"\n";
     //NOTE: check if pull bit is set
     if(m_isPull){
-    //get TNT (trace name table) entry
-    // XXX it might be that we store everything in the same place... -- jordan
-    //
-    shared_ptr<pit::TntEntry> pitTntEntry = pitEntry->getStrategyInfo<pit::TntEntry>();
-    if (static_cast<bool>(pitTntEntry)) {
-      NFD_LOG_TRACE("TNT entry (tracing interests) are found");
+      //get TNT (trace name table) entry
+      // XXX it might be that we store everything in the same place... -- jordan
+      //
+      shared_ptr<pit::TntEntry> pitTntEntry = pitEntry->getStrategyInfo<pit::TntEntry>();
+      if (static_cast<bool>(pitTntEntry)) {
+        NFD_LOG_TRACE("TNT entry (tracing interests) are found");
 
-      
-      // TODO for (auto & it : pitTntEntry->getTracingInterests()) {
-      const pit::TntEntry::TracingInterestList& tracingInterestRecords = pitTntEntry->getTracingInterests();
-      pit::TntEntry::TracingInterestList::const_iterator it;
-      for (it=tracingInterestRecords.begin(); it != tracingInterestRecords.end(); ++it) {
+        // TODO for (auto & it : pitTntEntry->getTracingInterests()) {
+        const pit::TntEntry::TracingInterestList& tracingInterestRecords = pitTntEntry->getTracingInterests();
+        pit::TntEntry::TracingInterestList::const_iterator it;
+        for (it=tracingInterestRecords.begin(); it != tracingInterestRecords.end(); ++it) {
 
-        const pit::TntRecord& TracingRecord = it->second;
-        if (!TracingRecord.isValid()) {
-          NFD_LOG_TRACE("SHOULD NOT HAPPEN ! meet tracing record. It's not valid, remove it");
-          pitTntEntry->removeTracingRecord(it);
-          continue;
+          const pit::TntRecord& TracingRecord = it->second;
+          if (!TracingRecord.isValid()) {
+            NFD_LOG_TRACE("SHOULD NOT HAPPEN ! meet tracing record. It's not valid, remove it");
+            pitTntEntry->removeTracingRecord(it);
+            continue;
+          }
+
+          NFD_LOG_TRACE("meet tracing record. It's valid");
+          //valid check guarantees below are valid share_pt:
+          shared_ptr<pit::Entry> tracingPitEntry = TracingRecord.getPitEntry().lock();
+          // XXX a single interest by record ??
+          shared_ptr<const Interest> tracingInterest = TracingRecord.getInterest().lock();
+
+          if ((TracingRecord.getInFace()).lock().get() == &inFace ||
+              ! tracingPitEntry->canForwardTo(inFace)) {
+            // XXX How could this happen, since we update
+            NFD_LOG_TRACE("SHOULD NOT HAPPEN ! tracing interest, not forwardable to inFace="<< inFace.getId() );
+  	        continue;
+          }
+
+          NFD_LOG_TRACE("tracing interest is forwardable to inFace=" << inFace.getId() );
+          //send the current interest to that incoming face:
+          // insert OutRecord
+          tracingPitEntry->insertOrUpdateOutRecord(face, *tracingInterest);
+          // send Interest
+          face->sendInterest(*tracingInterest);
+          ++m_counters.getNOutInterests();
+          NFD_LOG_INFO("tracing interest=" << tracingInterest->getName()
+              << ", pulled by interest="<< interest.getName()
+              <<", to face=" << inFace.getId());
         }
-
-        NFD_LOG_TRACE("meet tracing record. It's valid");
-        //valid check guarantees below are valid share_pt:
-        shared_ptr<pit::Entry> tracingPitEntry = TracingRecord.getPitEntry().lock(); 
-        // XXX a single interest by record ??
-        shared_ptr<const Interest> tracingInterest = TracingRecord.getInterest().lock(); 
-
-        if ((TracingRecord.getInFace()).lock().get() == &inFace ||
-            ! tracingPitEntry->canForwardTo(inFace)) {
-          // XXX How could this happen, since we update
-          NFD_LOG_TRACE("SHOULD NOT HAPPEN ! tracing interest, not forwardable to inFace="<< inFace.getId() );
-	  continue;
-        }
-
-        NFD_LOG_TRACE("tracing interest is forwardable to inFace=" << inFace.getId() );
-        //send the current interest to that incoming face:
-        // insert OutRecord
-        tracingPitEntry->insertOrUpdateOutRecord(face, *tracingInterest);
-        // send Interest
-        face->sendInterest(*tracingInterest);
-        ++m_counters.getNOutInterests();
-        NFD_LOG_INFO("tracing interest=" << tracingInterest->getName()
-            << ", pulled by interest="<< interest.getName()
-            <<", to face=" << inFace.getId());
       }
-    }
-   } //end if m_isPull
-  }
-
-  /* END HOOK : TRACED INTEREST */
+    } //end if m_isPull
+  }  /* END HOOK : TRACED INTEREST */
 
   if (isForwardedAsTracing && interest.getTraceForwardingFlag() != 255 &&
       ((interest.getTraceForwardingFlag() >> 1) & 1)) {
@@ -501,58 +502,58 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
 
       NFD_LOG_INFO("Broadcasting traced interest based on FIB entries" << fibEntry->getPrefix());
       //for(fib::NextHopList::const_iterator it=nexthops.begin(); it!=nexthops.end(); it++)
-      if(nexthops.size()!=0){
-      for (auto it : nexthops) {
-         shared_ptr<Face> outFace = it.getFace();
-	 if(outFace.get()==&inFace) //avoid loops
-	  continue;
-         //std::cout << "  . outFace " << outFace->getDescription() << std::endl;
-         outFace->sendInterest(interest);
-         ++m_counters.getNOutInterests();
-         pitEntry->insertOrUpdateOutRecord(outFace, interest);
-	
-	 //logging traced interest transmission at each router
-   // LOG: forwarding of Traced interest
-   // XXX there is no seq info available, let's put 0 in the mean time. See comment
-   // in other places in the code.
-	 m_onSpecialInterest(interest.getName().toUri(), SEQ_NA, TTL_NA, RETX_NA);
+      if(nexthops.size()!=0) {
+        for (auto it : nexthops) {
+          shared_ptr<Face> outFace = it.getFace();
+	        if(outFace.get()==&inFace) //avoid loops
+	          continue;
+          //std::cout << "  . outFace " << outFace->getDescription() << std::endl;
+          outFace->sendInterest(interest);
+          ++m_counters.getNOutInterests();
+          pitEntry->insertOrUpdateOutRecord(outFace, interest);
+
+          //logging traced interest transmission at each router
+          // LOG: forwarding of Traced interest
+          // XXX there is no seq info available, let's put 0 in the mean time. See comment
+          // in other places in the code.
+          m_onSpecialInterest(interest.getName().toUri(), SEQ_NA, TTL_NA, RETX_NA);
         }
-      } 
+      }
 #ifdef WITH_RELIABLE_RETRANSMISSION
       else {
         // THIS IS TO DETECT WE HAVE REACHED THE ANCHOR... it has no FIB entry
-	 //automatically send an ack interest back:
-         std::ostringstream nstream;
-         //NOTE: here it is assumed that prefix has only one name componet like /prefix0 ,
-         //we add a sequence number in the ack name to avoid the ack to be pending somewhere
-	 //xxx, should be generalized for longer prefix
-         nstream<<KITE_TRACE_ACK_PREFIX<<"/"<<m_ack_seq++<<interest.getName().toUri();
-//           std::cout <<"***************send back ack interest="<<nstream.str()<<"\n";
-         Name ackInterestName(nstream.str());
-         shared_ptr<Interest> ackInterest = make_shared<Interest>(ackInterestName);
+	      //automatically send an ack interest back:
+        std::ostringstream nstream;
+        //NOTE: here it is assumed that prefix has only one name componet like /prefix0 ,
+        //we add a sequence number in the ack name to avoid the ack to be pending somewhere
+	      //xxx, should be generalized for longer prefix
+        nstream<<KITE_TRACE_ACK_PREFIX<<"/"<<m_ack_seq++<<interest.getName().toUri();
+        // std::cout <<"***************send back ack interest="<<nstream.str()<<"\n";
+        Name ackInterestName(nstream.str());
+        shared_ptr<Interest> ackInterest = make_shared<Interest>(ackInterestName);
 
-         ackInterest->setTraceForwardingFlag(2); // interest shall be forwarded using trace only
-         ackInterest->setTraceName(interest.getName());
-	 face->sendInterest(*ackInterest);
-         ++m_counters.getNOutInterests();
-         pitEntry->insertOrUpdateOutRecord(face, *ackInterest);
-	 
-	 //Ack loggging is dsiabled
-	// m_onSpecialInterest(ackInterest->getName().toUri(), SEQ_NA, TTL_NA, RETX_NA);
+        ackInterest->setTraceForwardingFlag(2); // interest shall be forwarded using trace only
+        ackInterest->setTraceName(interest.getName());
+        face->sendInterest(*ackInterest);
+        ++m_counters.getNOutInterests();
+        pitEntry->insertOrUpdateOutRecord(face, *ackInterest);
+
+        //Ack loggging is dsiabled
+        // m_onSpecialInterest(ackInterest->getName().toUri(), SEQ_NA, TTL_NA, RETX_NA);
       }
 #endif
     } else {
         // dispatch to strategy
         //NFD_LOG_INFO("Sending interest based on FW strategy and FIB entries");
-        
+
         //NOTE: the following check is to guarantee that the pit entry created by following trace forwarding will not
         //be removed later by the attempt of FIB forwarding, which makes trace forwarding fail.
         //actually the straggler time of 100ms can prevent us from seeing this problem in most cases.
-        if(isForwardedAsTracing){
+        if(isForwardedAsTracing) {
           const fib::NextHopList& nexthops = fibEntry->getNextHops();
-          if (nexthops.size()!=0 && !(nexthops.size()==1 && nexthops.begin()->getFace().get() == &inFace) ){ //if it is neither the case that there's no matching FIB Nor the case that the only output face in FIB is the same as inFace of this interest(loop forwarding)
+          if (nexthops.size()!=0 && !(nexthops.size()==1 && nexthops.begin()->getFace().get() == &inFace)) { //if it is neither the case that there's no matching FIB Nor the case that the only output face in FIB is the same as inFace of this interest(loop forwarding)
               this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
-                  cref(inFace), cref(interest), fibEntry, pitEntry)); 
+                  cref(inFace), cref(interest), fibEntry, pitEntry));
           }
         } else {
           this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
@@ -572,12 +573,13 @@ ForwarderKite::onContentStoreMiss(const Face& inFace, shared_ptr<pit::Entry>
 
 }
 
+
 /* Hooks for special interest processing */
 void
 ForwarderKite::onIncomingInterest(Face& inFace, const Interest& interest)
 {
   Interest & interest_ = const_cast<Interest &>(interest);
-  
+
 #ifdef WITH_RELIABLE_RETRANSMISSION
   if( boost::starts_with(interest.getName().toUri(), KITE_TRACE_ACK_PREFIX)) // an ack interest is received
   {
@@ -593,7 +595,7 @@ ForwarderKite::onIncomingInterest(Face& inFace, const Interest& interest)
       {
        Forwarder::onIncomingInterest(inFace, interest_);/* Add trace for regular consumer interests */
       }
-      
+
       return;
   }
 #endif
@@ -610,8 +612,8 @@ ForwarderKite::onIncomingInterest(Face& inFace, const Interest& interest)
     interest_.setTraceName(traceName);
     interest_.setTraceForwardingFlag(KITE_FLAG_FOLLOW_TRACE_AND_FIB);
   }
-  
-  
+
+
   //XXX duplicate some codes from forwarder::OnIncomingInterest(), to be fixed later
 //here is to avoid content sore lookup for traced interest
 
@@ -631,7 +633,7 @@ ForwarderKite::onIncomingInterest(Face& inFace, const Interest& interest)
          // (drop)
         return;
      }
- 
+
      // PIT insert
      shared_ptr<pit::Entry> pitEntry = m_pit.insert(interest).first;
 
@@ -647,16 +649,16 @@ ForwarderKite::onIncomingInterest(Face& inFace, const Interest& interest)
 
      // cancel unsatisfy & straggler timer
      this->cancelUnsatisfyAndStragglerTimer(pitEntry);
-     
+
      this->onContentStoreMiss(inFace, pitEntry, interest);
-     return; 
+     return;
    }
 
   /* Add trace for regular consumer interests */
   Forwarder::onIncomingInterest(inFace, interest_);
 
 
-  
+
 }
 
 } // namespace nfd 
